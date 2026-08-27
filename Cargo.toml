@@ -2,5 +2,11 @@
 name = "filp"
 version = "0.1.0"
 edition = "2024"
+description = "Cross-platform file permission management"
+license = "MIT"
+repository = "https://github.com/megnm9/filp"
+readme = "README.md"
+keywords = ["file", "permissions", "filesystem"]
+categories = ["filesystem"]
 
 [dependencies]
