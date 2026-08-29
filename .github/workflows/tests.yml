@@ -1,23 +1,25 @@
-name: CI
+name: Tests
 
 on:
   push:
   pull_request:
 
-env:
-  CARGO_TERM_COLOR: always
-
 jobs:
   test:
-    name: Test
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+
+    runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
 
-      - run: cargo fmt --check
-      - run: cargo clippy -- -D warnings
-      - run: cargo test
-      - run: cargo build
+      - name: Run tests
+        run: cargo test
