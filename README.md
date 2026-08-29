@@ -2,7 +2,7 @@
 
 # filp
 
-**Cross-platform file permission management for Rust**
+**Cross-platform file permission management for Rust(windows in dev)**
 
 `filp` is a small, dependency-free library for reading and writing file
 permissions with a clean, human-friendly API built around explicit permission
@@ -47,13 +47,14 @@ filp = "0.1.0"
 Get the current permission mode (`u32`) of a file or directory:
 
 ```rust
-use filp::unix::get_mode;
+use filp::Permissions;
 
 fn main() -> std::io::Result<()> {
-    let mode = get_mode("README.md")?;
-
-    // mode is a raw octal value, e.g. 0o644
-    println!("mode: {:o}", mode);
+    
+    let perm = Permissions::from_path("my_file.txt");
+    
+    println!("File mode: {:o}", perm.get_mode()?);
+    
     Ok(())
 }
 ```
@@ -63,11 +64,20 @@ fn main() -> std::io::Result<()> {
 Set the exact permission mode of a file:
 
 ```rust
-use filp::unix::set_mode;
-use filp::types::EXECUTABLE;
+use filp::Permissions;
+use filp::types::{FULL, READ_ONLY};
 
 fn main() -> std::io::Result<()> {
-    set_mode("my_script.sh", EXECUTABLE)?; // 0o755
+    let perm = Permissions::from_path("my_file.txt");
+
+    perm.set_mode(READ_ONLY)?;
+
+    println!("File mode: {:o}", perm.get_mode()?);
+
+    perm.set_mode(FULL)?;
+
+    println!("File mode: {:o}", perm.get_mode()?);
+
     Ok(())
 }
 ```
@@ -91,13 +101,13 @@ fn main() -> std::io::Result<()> {
 
 And a few handy pre-built combinations:
 
-| Constant     | Octal | Use case                        |
-| ------------ | ----- | ------------------------------- |
-| `READ_ONLY`  | `0o444` | World-readable files        |
-| `READ_WRITE` | `0o666` | Regular data files          |
-| `EXECUTABLE` | `0o755` | Executable scripts/binaries |
-| `PRIVATE`    | `0o700` | Private owner-only files    |
-| `FULL`       | `0o777` | Everything enabled          |
+| Constant     | Octal   | Use case                                |
+| ------------ | ------- | --------------------------------------- |
+| `READ_ONLY`  | `0o444` | Read-only for owner, group, and others  |
+| `READ_WRITE` | `0o666` | Read/write for owner, group, and others |
+| `EXECUTABLE` | `0o755` | Executable scripts/binaries             |
+| `PRIVATE`    | `0o700` | Private owner-only files                |
+| `FULL`       | `0o777` | Everything enabled                      |
 
 ### Combining permissions
 
@@ -105,7 +115,7 @@ And a few handy pre-built combinations:
 exactly the permission set you want:
 
 ```rust
-use filp::unix::{get_mode, set_mode};
+use filp::Permissions;
 use filp::types::{OWNER_READ, OWNER_WRITE, OWNER_EXECUTE, GROUP_READ, OTHER_READ};
 
 fn main() -> std::io::Result<()> {
@@ -114,8 +124,9 @@ fn main() -> std::io::Result<()> {
     //                    ^ 0o100                        ^ 0o040        ^ 0o004
     //                    == 0o744
 
-    set_mode("notes.txt", mode)?;
-    assert_eq!(get_mode("notes.txt")? & 0o777, mode);
+    let perm = Permissions::from_path("my_file.txt");
+    
+    perm.set_mode(mode)?;
     Ok(())
 }
 ```
@@ -123,11 +134,12 @@ fn main() -> std::io::Result<()> {
 You can also `AND` with a mask to inspect a specific permission:
 
 ```rust
-use filp::unix::get_mode;
+use filp::Permissions;
 use filp::types::OWNER_READ;
 
 fn main() -> std::io::Result<()> {
-    let mode = get_mode("secret.txt")?;
+    let perm = Permissions::from_path("my_file.txt");
+    let mode = perm.get_mode()?;
     let owner_can_read = mode & OWNER_READ != 0;
     println!("owner can read: {owner_can_read}");
     Ok(())

@@ -1,16 +1,3 @@
-//! Permission bits for Unix file modes.
-//!
-//! These constants can be combined using the bitwise OR (`|`) operator.
-//!
-//! # Example
-//!
-//! ```
-//! use filp::types::*;
-//!
-//! let mode = OWNER_READ | OWNER_WRITE | GROUP_READ | OTHER_READ;
-//! assert_eq!(mode, 0o644);
-//! ```
-
 /// Owner read permission.
 pub const OWNER_READ: u32 = 0o400;
 
