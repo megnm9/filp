@@ -35,7 +35,7 @@ Add `filp` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-filp = "0.1.0"
+filp = "0.2.0"
 ```
 
 ---
