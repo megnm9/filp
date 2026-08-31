@@ -2,30 +2,16 @@
 
 # filp
 
-**Cross-platform file permission management for Rust(windows in dev)**
+**Cross-platform file-permission management for Rust**
 
-`filp` is a small, dependency-free library for reading and writing file
-permissions with a clean, human-friendly API built around explicit permission
-bit constants.
+`filp` is a small, dependency-free library for inspecting and updating file
+permissions on Unix and Windows.
 
-![Platforms: Unix ✓, Windows ⏳](https://img.shields.io/badge/platform-unix%20%7C%20windows%20(soon)-3da7db)
+![Platforms: Unix and Windows](https://img.shields.io/badge/platform-unix%20%7C%20windows-3da7db)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
-![Version](https://img.shields.io/badge/version-0.1.0-blue)
+![Version](https://img.shields.io/badge/version-0.3.0-blue)
 
 </div>
-
----
-
-## Table of Contents
-
-- [Installing](#installing)
-- [Usage](#usage)
-  - [Reading permissions](#reading-permissions)
-  - [Setting permissions](#setting-permissions)
-  - [Permission constants](#permission-constants)
-  - [Combining permissions](#combining-permissions)
-- [Platform support](#platform-support)
-- [License](#license)
 
 ---
 
@@ -35,128 +21,104 @@ Add `filp` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-filp = "0.2.0"
+filp = "0.3.0"
 ```
 
 ---
 
 ## Usage
 
-### Reading permissions
-
-Get the current permission mode (`u32`) of a file or directory:
+`Permissions` stores a snapshot of a path's owner read, write, and execute
+permissions. Construct it with a `PathBuf`:
 
 ```rust
 use filp::Permissions;
+use std::path::PathBuf;
 
-fn main() -> std::io::Result<()> {
-    
-    let perm = Permissions::from_path("my_file.txt");
-    
-    println!("File mode: {:o}", perm.get_mode()?);
-    
-    Ok(())
-}
+let path = PathBuf::from("my_file.txt");
+let permissions = Permissions::from_path(path)?;
+
+assert!(permissions.is_owner_readable());
+println!("Path: {}", permissions.get_path().display());
+# Ok::<(), std::io::Error>(())
 ```
 
-### Setting permissions
+On Unix, `from_path` returns `io::Result<Permissions>` and `get_mode` returns
+`io::Result<u32>`. Windows returns `Permissions` and `u32` directly; see the
+[Windows notes](#windows-notes) for its current limitations.
 
-Set the exact permission mode of a file:
+### Reading and setting modes on Unix
+
+Use familiar Unix-style octal modes to read or update a path:
 
 ```rust
 use filp::Permissions;
-use filp::types::{FULL, READ_ONLY};
+use std::path::PathBuf;
 
-fn main() -> std::io::Result<()> {
-    let perm = Permissions::from_path("my_file.txt");
+let path = PathBuf::from("my_file.txt");
+let mut permissions = Permissions::from_path(path)?;
 
-    perm.set_mode(READ_ONLY)?;
+permissions.set_mode(0o644)?;
+println!("File mode: {:o}", permissions.get_mode()?);
+# Ok::<(), std::io::Error>(())
+```
 
-    println!("File mode: {:o}", perm.get_mode()?);
+After `set_mode`, the owner-permission query methods reflect the new mode:
 
-    perm.set_mode(FULL)?;
-
-    println!("File mode: {:o}", perm.get_mode()?);
-
-    Ok(())
-}
+```rust
+# use filp::Permissions;
+# use std::path::PathBuf;
+# let mut permissions = Permissions::from_path(PathBuf::from("my_file.txt"))?;
+permissions.set_mode(0o700)?;
+assert!(permissions.is_owner_readable());
+assert!(permissions.is_owner_writable());
+assert!(permissions.is_owner_executable());
+# Ok::<(), std::io::Error>(())
 ```
 
 ### Permission constants
 
-`filp` exposes named constants instead of magic numbers. Each maps to a familiar
-`chmod` value:
+Named bit flags are re-exported from the crate root and can be combined to
+make a mode:
 
-| Constant  | Octal | Meaning                       |
-| --------- | ----- | ----------------------------- |
-| `OWNER_READ`    | `0o400` | Read for the owner     |
-| `OWNER_WRITE`   | `0o200` | Write for the owner    |
-| `OWNER_EXECUTE` | `0o100` | Execute for the owner  |
-| `GROUP_READ`    | `0o040` | Read for the group     |
-| `GROUP_WRITE`   | `0o020` | Write for the group    |
-| `GROUP_EXECUTE` | `0o010` | Execute for the group  |
-| `OTHER_READ`    | `0o004` | Read for others        |
-| `OTHER_WRITE`   | `0o002` | Write for others       |
-| `OTHER_EXECUTE` | `0o001` | Execute for others     |
+```rust
+use filp::{GROUP_READ, OTHER_READ, OWNER_EXECUTE, OWNER_READ, OWNER_WRITE};
 
-And a few handy pre-built combinations:
+let mode = OWNER_READ | OWNER_WRITE | OWNER_EXECUTE | GROUP_READ | OTHER_READ;
+assert_eq!(mode, 0o744);
+```
 
-| Constant     | Octal   | Use case                                |
-| ------------ | ------- | --------------------------------------- |
-| `READ_ONLY`  | `0o444` | Read-only for owner, group, and others  |
+| Constant | Octal | Meaning |
+| --- | --- | --- |
+| `OWNER_READ`, `OWNER_WRITE`, `OWNER_EXECUTE` | `0o400`, `0o200`, `0o100` | Owner permissions |
+| `GROUP_READ`, `GROUP_WRITE`, `GROUP_EXECUTE` | `0o040`, `0o020`, `0o010` | Group permissions |
+| `OTHER_READ`, `OTHER_WRITE`, `OTHER_EXECUTE` | `0o004`, `0o002`, `0o001` | Other-user permissions |
+| `READ_ONLY` | `0o444` | Read-only for owner, group, and others |
 | `READ_WRITE` | `0o666` | Read/write for owner, group, and others |
-| `EXECUTABLE` | `0o755` | Executable scripts/binaries             |
-| `PRIVATE`    | `0o700` | Private owner-only files                |
-| `FULL`       | `0o777` | Everything enabled                      |
-
-### Combining permissions
-
-`filp`'s constants are plain bit flags, so you can combine them freely to build
-exactly the permission set you want:
-
-```rust
-use filp::Permissions;
-use filp::types::{OWNER_READ, OWNER_WRITE, OWNER_EXECUTE, GROUP_READ, OTHER_READ};
-
-fn main() -> std::io::Result<()> {
-    // Owner can read/write/execute; group and others can read.
-    let mode = OWNER_READ | OWNER_WRITE | OWNER_EXECUTE | GROUP_READ | OTHER_READ;
-    //                    ^ 0o100                        ^ 0o040        ^ 0o004
-    //                    == 0o744
-
-    let perm = Permissions::from_path("my_file.txt");
-    
-    perm.set_mode(mode)?;
-    Ok(())
-}
-```
-
-You can also `AND` with a mask to inspect a specific permission:
-
-```rust
-use filp::Permissions;
-use filp::types::OWNER_READ;
-
-fn main() -> std::io::Result<()> {
-    let perm = Permissions::from_path("my_file.txt");
-    let mode = perm.get_mode()?;
-    let owner_can_read = mode & OWNER_READ != 0;
-    println!("owner can read: {owner_can_read}");
-    Ok(())
-}
-```
+| `EXECUTABLE` | `0o755` | Conventional executable mode |
+| `PRIVATE` | `0o700` | Full access for the owner only |
+| `FULL` | `0o777` | Full access for everyone |
 
 ---
 
 ## Platform support
 
-| Platform | Status                    |
-| -------- | ------------------------- |
-| Unix     | ✅ Fully implemented      |
-| Windows  | ⏳ Coming soon            |
+| Platform | Status | Details |
+| --- | --- | --- |
+| Unix | ✅ Supported | Reads and writes Unix permission modes. Owner query methods inspect owner bits. |
+| Windows | ✅ Supported with limitations | Uses `icacls` to manage the current user's ACL entries. |
 
-On non-Unix platforms the `unix` module is not compiled. Windows support is
-being developed and will live behind the `win` module.
+### Windows notes
+
+Windows support currently handles **only the current user's (owner-style)
+permissions**. Group and other permission bits in a Unix-style mode are not
+managed as Windows ACL entries.
+
+On Windows, `set_mode` translates the owner read, write, and execute bits to
+`icacls` permissions for the current user. `get_mode` represents those stored
+flags as owner bits and reports group and other as read-only (`0o044`).
+Executability detected when opening a path is based on common executable file
+extensions such as `.exe`, `.bat`, `.cmd`, `.com`, `.msi`, and `.ps1`.
 
 ---
 

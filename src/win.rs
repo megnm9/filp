@@ -3,6 +3,10 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+/// Describes the current user's effective permissions for a Windows path.
+///
+/// Windows access-control entries are represented as owner-style read, write,
+/// and execute flags for a consistent cross-platform API.
 pub struct Permissions {
     path: PathBuf,
     readable: bool,
@@ -11,6 +15,10 @@ pub struct Permissions {
 }
 
 impl Permissions {
+    /// Creates a permission snapshot for `filepath`.
+    ///
+    /// Read and write access are determined by attempting to open the path;
+    /// execute access is inferred from common executable file extensions.
     pub fn from_path(filepath: PathBuf) -> Permissions {
         let (r, w, e) = check_access(&filepath);
 
@@ -22,10 +30,18 @@ impl Permissions {
         }
     }
 
+    /// Returns a Unix-style permission mode representing these flags.
+    ///
+    /// The owner bits reflect the stored flags, while group and other are
+    /// always reported as read-only.
     pub fn get_mode(&self) -> u32 {
         rwx_to_mode(self.readable, self.writable, self.executable)
     }
 
+    /// Updates this path's access-control entries for the current user.
+    ///
+    /// The supplied Unix-style owner bits are translated to `icacls` read,
+    /// write, and execute permissions.
     pub fn set_mode(&mut self, mode: u32) -> io::Result<()> {
         let (r, w, x) = mode_to_rwx(mode);
         let path = self.path.to_str().unwrap();
@@ -38,18 +54,23 @@ impl Permissions {
         Ok(())
     }
 
+    /// Returns the path associated with this permission snapshot.
     pub fn get_path(&self) -> PathBuf {
         self.path.clone()
     }
-    pub fn is_readable(&self) -> bool {
+    /// Returns whether the current user can read the path.
+    pub fn is_owner_readable(&self) -> bool {
         self.readable
     }
-    pub fn is_writable(&self) -> bool {
+    /// Returns whether the current user can write to the path.
+    pub fn is_owner_writable(&self) -> bool {
         self.writable
     }
-    pub fn is_executable(&self) -> bool {
+    /// Returns whether the current user can execute the path.
+    pub fn is_owner_executable(&self) -> bool {
         self.executable
     }
+    /// Returns the current Windows account name.
     pub fn get_username() -> io::Result<String> {
         current_user()
     }
@@ -69,7 +90,7 @@ fn mode_to_rwx(mode: u32) -> (bool, bool, bool) {
     )
 }
 
-fn check_access(path: &Path) -> (bool, bool, bool) {
+fn check_access(path: &Path) -> io::Result<(bool, bool, bool)> {
     let readable = OpenOptions::new().read(true).open(path).is_ok();
 
     let writable = OpenOptions::new().write(true).open(path).is_ok();
@@ -87,7 +108,7 @@ fn check_access(path: &Path) -> (bool, bool, bool) {
         })
         .unwrap_or(false);
 
-    (readable, writable, executable)
+    Ok((readable, writable, executable))
 }
 
 fn set_access(path: &str, readable: bool, writable: bool, executable: bool) -> io::Result<()> {
