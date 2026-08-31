@@ -1,5 +1,6 @@
+#![cfg(windows)]
+
 #[cfg(test)]
-#[cfg(windows)]
 mod permissions_tests {
     use filp::*;
     use std::fs;
@@ -34,8 +35,8 @@ mod permissions_tests {
     fn from_path_normal_file_is_readable_and_writable() {
         let path = temp_file("normal.txt");
         let perms = Permissions::from_path(path.clone());
-        assert!(perms.is_readable());
-        assert!(perms.is_writable());
+        assert!(perms.is_owner_readable());
+        assert!(perms.is_owner_writable());
         cleanup(&path);
     }
 
@@ -43,7 +44,7 @@ mod permissions_tests {
     fn from_path_txt_extension_not_executable() {
         let path = temp_file("plain.txt");
         let perms = Permissions::from_path(path.clone());
-        assert!(!perms.is_executable());
+        assert!(!perms.is_owner_executable());
         cleanup(&path);
     }
 
@@ -51,7 +52,7 @@ mod permissions_tests {
     fn from_path_exe_extension_is_executable() {
         let path = temp_file("thing.exe");
         let perms = Permissions::from_path(path.clone());
-        assert!(perms.is_executable());
+        assert!(perms.is_owner_executable());
         cleanup(&path);
     }
 
@@ -64,8 +65,8 @@ mod permissions_tests {
         ));
         // Deliberately not creating the file.
         let perms = Permissions::from_path(path.clone());
-        assert!(!perms.is_readable());
-        assert!(!perms.is_writable());
+        assert!(!perms.is_owner_readable());
+        assert!(!perms.is_owner_writable());
     }
 
     // ---------------------------------------------------------------
@@ -111,9 +112,9 @@ mod permissions_tests {
             let target_mode = 0o444; // r--
             perms.set_mode(target_mode).expect("set_mode failed");
 
-            assert!(perms.is_readable());
-            assert!(!perms.is_writable());
-            assert!(!perms.is_executable());
+            assert!(perms.is_owner_readable());
+            assert!(!perms.is_owner_writable());
+            assert!(!perms.is_owner_executable());
             assert_eq!(perms.get_mode(), target_mode);
 
             // restore so cleanup can delete the file
@@ -134,10 +135,10 @@ mod permissions_tests {
             // not just our in-memory flags).
             let reloaded = Permissions::from_path(path.clone());
             assert!(
-                !reloaded.is_writable(),
+                !reloaded.is_owner_writable(),
                 "icacls deny WD did not persist on disk"
             );
-            assert!(reloaded.is_readable());
+            assert!(reloaded.is_owner_readable());
 
             // restore before cleanup
             perms.set_mode(0o644).ok();
@@ -149,17 +150,17 @@ mod permissions_tests {
             let path = temp_file("win_exec_grant.dat"); // non-.exe, so
             // executability only comes from ACL, not extension
             let mut perms = Permissions::from_path(path.clone());
-            assert!(!perms.is_executable());
+            assert!(!perms.is_owner_executable());
 
             perms.set_mode(0o744).expect("set_mode failed"); // rwx
-            assert!(perms.is_executable());
+            assert!(perms.is_owner_executable());
 
             let reloaded = Permissions::from_path(path.clone());
             // Note: check_access only detects executable via extension,
             // so a reloaded Permissions on a .dat file will report
             // is_executable() == false even after icacls granted X.
             // This asymmetry is worth knowing about — see note below.
-            assert!(!reloaded.is_executable());
+            assert!(!reloaded.is_owner_executable());
 
             perms.set_mode(0o644).ok();
             cleanup(&path);

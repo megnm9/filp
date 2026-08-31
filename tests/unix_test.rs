@@ -1,3 +1,5 @@
+#![cfg(unix)]
+
 /*
 #[cfg(test)]
 mod tests {

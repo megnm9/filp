@@ -90,7 +90,7 @@ fn mode_to_rwx(mode: u32) -> (bool, bool, bool) {
     )
 }
 
-fn check_access(path: &Path) -> io::Result<(bool, bool, bool)> {
+fn check_access(path: &Path) -> (bool, bool, bool) {
     let readable = OpenOptions::new().read(true).open(path).is_ok();
 
     let writable = OpenOptions::new().write(true).open(path).is_ok();
@@ -108,7 +108,7 @@ fn check_access(path: &Path) -> io::Result<(bool, bool, bool)> {
         })
         .unwrap_or(false);
 
-    Ok((readable, writable, executable))
+    (readable, writable, executable)
 }
 
 fn set_access(path: &str, readable: bool, writable: bool, executable: bool) -> io::Result<()> {
