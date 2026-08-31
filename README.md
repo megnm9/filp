@@ -9,7 +9,7 @@ permissions on Unix and Windows.
 
 ![Platforms: Unix and Windows](https://img.shields.io/badge/platform-unix%20%7C%20windows-3da7db)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
-![Version](https://img.shields.io/badge/version-0.3.0-blue)
+![Version](https://img.shields.io/badge/version-0.3.1-blue)
 
 </div>
 
@@ -21,7 +21,7 @@ Add `filp` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-filp = "0.3.0"
+filp = "0.3.1"
 ```
 
 ---
